@@ -1,22 +1,21 @@
-class SimpleAdmin
-  
-  attr_reader :open_id
-  
-  def self.find(user)
-    admins = YAML.load_file(File.join(RAILS_ROOT, 'config', 'simple_admins.yml'))
-    if admins.include?(user)
-      self.new(user)
-    end
-  end
-  
-  def initialize(user)
-    @open_id = user
-  end
-end
-
 class SessionsController < ApplicationController
+  
   def create
-    open_id_authentication(params[:openid_identifier])
+    if openid = request.env["rack.openid.response"]
+      if openid.status == :success
+        if sa = SimpleAdmin.find(openid.display_identifier)
+          current_user = sa.openid
+          render :text => "Welcome: #{sa.openid}"
+        end
+      else
+        render :text => "Error: #{openid.status}"
+      end
+    else
+      response.headers['WWW-Authenticate'] = Rack::OpenID.build_header(
+        :identifier => params["openid_identifier"]
+      )
+      render :text => '', :status => 401
+    end
   end
 
   def destroy
@@ -24,36 +23,14 @@ class SessionsController < ApplicationController
     flash[:notice] = "You have been signed out"
     redirect_to '/'
   end
-
-protected
-  def open_id_authentication(openid)
-    authenticate_with_open_id(openid) do |result, identity_url, registration|
-	    if result.successful?
-	      if @current_user = SimpleAdmin.find(identity_url)
-          @current_user.save(false)
-	        successful_login(!@current_user.valid?)
-        else
-          failed_login "This OpenID not allowed"
-	      end
-	    else
-	      failed_login result.message
-	    end
-    end
-  end
-    
-private
-  def successful_login(needs_info = false)
-    session[:user_id] = @current_user.id
-    if needs_info
-      redirect_to edit_user_url(@current_user)
-    else
-      redirect_to(root_url)
-    end
-  end
-
-  def failed_login(message)
-    flash[:notice] = message
-    redirect_to(new_session_url)
+  
+  private
+  
+  def current_user=(openid)
+    session[:simple_admin] = openid
+  end 
+  
+  def current_user
+    SimpleAdmin.find(session[:simple_admin])
   end
 end
-
