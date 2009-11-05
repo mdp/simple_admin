@@ -1,14 +1,27 @@
 class SessionsController < ApplicationController
   
+  def new
+    render :layout => nil
+  end
+  
   def create
     if openid = request.env["rack.openid.response"]
       if openid.status == :success
         if sa = SimpleAdmin.find(openid.display_identifier)
-          current_user = sa.openid
-          render :text => "Welcome: #{sa.openid}"
+          self.current_user = sa.openid
+          p self.current_user
+          if session[:return_to]
+            redirect_to session[:return_to]
+          else
+            redirect_to '/'
+          end
+        else
+          flash[:error] = "Not Authorized"
+          render :new
         end
       else
-        render :text => "Error: #{openid.status}"
+        flash[:error] = "Error: #{openid.status}"
+        render :new
       end
     else
       response.headers['WWW-Authenticate'] = Rack::OpenID.build_header(
@@ -24,13 +37,4 @@ class SessionsController < ApplicationController
     redirect_to '/'
   end
   
-  private
-  
-  def current_user=(openid)
-    session[:simple_admin] = openid
-  end 
-  
-  def current_user
-    SimpleAdmin.find(session[:simple_admin])
-  end
 end

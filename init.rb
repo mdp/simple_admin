@@ -6,4 +6,6 @@ config.to_prepare do
 
 
   config.middleware.use ::Rack::OpenID, OpenID::Store::Filesystem.new("#{RAILS_ROOT}/tmp/openid")
+  OpenID::Util.logger = Rails.logger
+  ActionController::Base.send :include, SimpleAdminAuth
 end
